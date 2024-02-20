@@ -15,7 +15,7 @@ class MultiLabelDataset(Dataset):
                 for filename in os.listdir(os.path.join(root_dir, label1, label2)):
                     if filename.endswith(('.png', '.jpg', '.jpeg')):
                         img_path = os.path.join(root_dir, label1, label2, filename)
-                        self.samples.append((img_path, (self.label1list.index(label1), self.label2list.index(label2))))
+                        self.samples.append((img_path, (self.label1list.index(label1), self.label2list.index(label2)+len(self.label1list)+1)))
 
     def __len__(self):
         return len(self.samples)
