@@ -190,13 +190,13 @@ class ResBlock(nn.Module):
 
 
 class UNet(nn.Module):
-    def __init__(self, T, num_labels, ch, ch_mult, attn, num_res_blocks, dropout):
+    def __init__(self, T, num_labels, num_shapes, ch, ch_mult, attn, num_res_blocks, dropout):
         super().__init__()
         assert all([i < len(ch_mult) for i in attn]), 'attn index out of bound'
         tdim = ch * 4
         self.time_embedding = TimeEmbedding(T, ch, tdim)
         self.cond_embedding1 = ConditionalEmbedding(num_labels, ch, tdim)
-        self.cond_embedding2 = ConditionalEmbedding(5, ch, tdim)
+        self.cond_embedding2 = ConditionalEmbedding(num_shapes, ch, tdim)
 
         self.head = nn.Conv2d(3, ch, kernel_size=3, stride=1, padding=1)
         self.downblocks = nn.ModuleList()

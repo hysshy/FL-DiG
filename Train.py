@@ -38,7 +38,7 @@ def train(modelConfig: Dict):
     dataloader = DataLoader(
         dataset, batch_size=modelConfig["batch_size"], shuffle=True, num_workers=4, drop_last=True, pin_memory=True)
     # model setup
-    net_model = UNet(T=modelConfig["T"],  num_labels=modelConfig["num_labels"], ch=modelConfig["channel"], ch_mult=modelConfig["channel_mult"], attn=modelConfig["attn"],
+    net_model = UNet(T=modelConfig["T"],  num_labels=modelConfig["num_labels"], num_shapes=modelConfig["num_shapes"], ch=modelConfig["channel"], ch_mult=modelConfig["channel_mult"], attn=modelConfig["attn"],
                      num_res_blocks=modelConfig["num_res_blocks"], dropout=modelConfig["dropout"]).to(device)
     if modelConfig["training_load_weight"] is not None:
         net_model.load_state_dict(torch.load(os.path.join(
@@ -84,7 +84,7 @@ def eval(modelConfig: Dict):
     # load model and evaluate
     with torch.no_grad():
         device = torch.device(modelConfig["device"])
-        model = UNet(T=modelConfig["T"], num_labels=modelConfig['num_labels'], ch=modelConfig["channel"], ch_mult=modelConfig["channel_mult"], attn=modelConfig["attn"],
+        model = UNet(T=modelConfig["T"], num_labels=modelConfig['num_labels'], num_shapes=modelConfig["num_shapes"], ch=modelConfig["channel"], ch_mult=modelConfig["channel_mult"], attn=modelConfig["attn"],
                      num_res_blocks=modelConfig["num_res_blocks"], dropout=0.)
         ckpt = torch.load(os.path.join(
             modelConfig["save_weight_dir"], modelConfig["test_load_weight"]), map_location=device)
@@ -95,31 +95,37 @@ def eval(modelConfig: Dict):
             model, modelConfig["beta_1"], modelConfig["beta_T"], modelConfig["T"], w=modelConfig["w"]).to(device)
         # Sampled from standard normal distribution
         savePath = modelConfig["save_weight_dir"]
-        classes = ['bianping', 'damo', 'duoge', 'fangda', 'shikuai']
+        shapes = ['扁平', '工艺品', '碎块', '表面', '石块']
+        classes = ['bornite_class', 'pyrite_class', 'muscovite_class', 'biotite_class', 'malachite_class', 'chrysocolla_class', 'quartz_class']
         with torch.no_grad():
-            for c in range(len(classes)):
-                for m in range(1):
-                    labelList = []
-                    for i in range(0, modelConfig["batch_size"]):
-                        labelList.append(torch.ones(size=[1]).long() * c)
-                    labels = torch.cat(labelList, dim=0).long().to(device)
-                    # Sampled from standard normal distribution
-                    noisyImage = torch.randn(
-                        size=[modelConfig["batch_size"], 3, modelConfig["img_size"], modelConfig["img_size"]],
-                        device=device)
-                    saveNoisy = torch.clamp(noisyImage * 0.5 + 0.5, 0, 1)
-                    save_image(saveNoisy, os.path.join(
-                        modelConfig["sampled_dir"], modelConfig["sampledNoisyImgName"]), nrow=modelConfig["nrow"])
-                    sampledImgs = sampler(noisyImage, labels)
-                    sampledImgs = sampledImgs * 0.5 + 0.5  # [0 ~ 1]
-                    if not os.path.exists(savePath + '/' + classes[c]):
-                        os.makedirs(savePath + '/' + classes[c])
-                    for i in range(len(sampledImgs)):
-                        ndarr = sampledImgs[i].mul(255).add_(0.5).clamp_(0, 255).permute(1, 2, 0).to('cpu',
-                                                                                                     torch.uint8).numpy()
-                        im = Image.fromarray(ndarr)
-                        im.save(savePath + '/' + classes[c] + '/' + str(m * modelConfig["batch_size"] + i) + '.jpg',
-                                format=None)
+            for cls_label in range(len(classes)):
+                for shape_label in range(len(shapes)):
+                    for m in range(1):
+                        cls_labelList = []
+                        for i in range(0, modelConfig["batch_size"]):
+                            cls_labelList.append(torch.ones(size=[1]).long() * cls_label)
+                        cls_labels = torch.cat(cls_labelList, dim=0).long().to(device)
+                        shape_labelList = []
+                        for i in range(0, modelConfig["batch_size"]):
+                            shape_labelList.append(torch.ones(size=[1]).long() * shape_label)
+                        shape_labels = torch.cat(shape_labelList, dim=0).long().to(device)
+                        # Sampled from standard normal distribution
+                        noisyImage = torch.randn(
+                            size=[modelConfig["batch_size"], 3, modelConfig["img_size"], modelConfig["img_size"]],
+                            device=device)
+                        saveNoisy = torch.clamp(noisyImage * 0.5 + 0.5, 0, 1)
+                        save_image(saveNoisy, os.path.join(
+                            modelConfig["sampled_dir"], modelConfig["sampledNoisyImgName"]), nrow=modelConfig["nrow"])
+                        sampledImgs = sampler(noisyImage, cls_labels, shape_labels)
+                        sampledImgs = sampledImgs * 0.5 + 0.5  # [0 ~ 1]
+                        if not os.path.exists(savePath + '/' + classes[cls_label] + '/' + shapes[shape_label]):
+                            os.makedirs(savePath + '/' + classes[cls_label] + '/' + shapes[shape_label])
+                        for i in range(len(sampledImgs)):
+                            ndarr = sampledImgs[i].mul(255).add_(0.5).clamp_(0, 255).permute(1, 2, 0).to('cpu',
+                                                                                                         torch.uint8).numpy()
+                            im = Image.fromarray(ndarr)
+                            im.save(savePath + '/' + classes[cls_label] + '/' + shapes[shape_label] + '/' + str(m * modelConfig["batch_size"] + i) + '.jpg',
+                                    format=None)
         # noisyImage = torch.randn(
         #     size=[modelConfig["batch_size"], 3, modelConfig["img_size"], modelConfig["img_size"]], device=device)
         # saveNoisy = torch.clamp(noisyImage * 0.5 + 0.5, 0, 1)

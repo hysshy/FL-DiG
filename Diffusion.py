@@ -71,18 +71,18 @@ class GaussianDiffusionSampler(nn.Module):
             extract(self.coeff2, t, x_t.shape) * eps
         )
 
-    def p_mean_variance(self, x_t, t, labels):
+    def p_mean_variance(self, x_t, t, labels, shapes):
         # below: only log_variance is used in the KL computations
         var = torch.cat([self.posterior_var[1:2], self.betas[1:]])
         var = extract(var, t, x_t.shape)
-        eps = self.model(x_t, t, labels)
-        nonEps = self.model(x_t, t, torch.zeros_like(labels).to(labels.device))
+        eps = self.model(x_t, t, labels, shapes)
+        nonEps = self.model(x_t, t, torch.zeros_like(labels).to(labels.device), torch.zeros_like(shapes).to(shapes.device))
         eps = (1. + self.w) * eps - self.w * nonEps
         xt_prev_mean = self.predict_xt_prev_mean_from_eps(x_t, t, eps=eps)
 
         return xt_prev_mean, var
 
-    def forward(self, x_T, labels):
+    def forward(self, x_T, labels, shapes):
         """
         Algorithm 2.
         """
@@ -90,7 +90,7 @@ class GaussianDiffusionSampler(nn.Module):
         for time_step in reversed(range(self.T)):
             print(time_step)
             t = x_t.new_ones([x_T.shape[0], ], dtype=torch.long) * time_step
-            mean, var= self.p_mean_variance(x_t=x_t, t=t, labels=labels)
+            mean, var= self.p_mean_variance(x_t=x_t, t=t, labels=labels, shapes=shapes)
             # no noise when t == 0
             if time_step > 0:
                 noise = torch.randn_like(x_t)

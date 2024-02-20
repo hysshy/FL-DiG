@@ -28,6 +28,7 @@ def main(model_config = None):
         "nrow": 8,
         "data_dir": '/home/chase/shy/DDPM4MINER/classes',
         "num_labels":7,
+        "num_shapes":5,
         "w": 0.2
         }
     if model_config is not None:
