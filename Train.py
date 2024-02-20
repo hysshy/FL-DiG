@@ -6,6 +6,7 @@ import torch
 import torch.optim as optim
 from tqdm import tqdm
 from torch.utils.data import DataLoader
+from multilabeldata import MultiLabelDataset
 from torchvision import transforms
 from torchvision.datasets import CIFAR10
 from torchvision.utils import save_image
@@ -33,7 +34,7 @@ def train(modelConfig: Dict):
         transforms.ToTensor(),
         transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),
     ])
-    dataset = datasets.ImageFolder(modelConfig["data_dir"], data_transforms)
+    dataset = MultiLabelDataset(modelConfig["data_dir"], data_transforms)
     dataloader = DataLoader(
         dataset, batch_size=modelConfig["batch_size"], shuffle=True, num_workers=4, drop_last=True, pin_memory=True)
     # model setup
@@ -54,12 +55,13 @@ def train(modelConfig: Dict):
     # start training
     for e in range(modelConfig["epoch"]):
         with tqdm(dataloader, dynamic_ncols=True) as tqdmDataLoader:
-            for images, labels in tqdmDataLoader:
+            for images, (cls_label, shape_label) in tqdmDataLoader:
                 # train
                 optimizer.zero_grad()
                 x_0 = images.to(device)
-                labels = labels.to(device)
-                loss = trainer(x_0, labels).sum() / 1000.
+                cls_label = cls_label.to(device)
+                shape_label = shape_label.to(device)
+                loss = trainer(x_0, cls_label, shape_label).sum() / 1000.
                 loss.backward()
                 torch.nn.utils.clip_grad_norm_(
                     net_model.parameters(), modelConfig["grad_clip"])
