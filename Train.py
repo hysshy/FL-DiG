@@ -62,7 +62,8 @@ def train(modelConfig: Dict):
                 cls_label = cls_label.to(device) + 1
                 shape_label = shape_label.to(device) + 1
                 if np.random.rand() < 0.1:
-                    labels = torch.zeros_like(labels).to(device)
+                    cls_label = torch.zeros_like(cls_label).to(device)
+                    shape_label = torch.zeros_like(shape_label).to(device)
                 loss = trainer(x_0, cls_label, shape_label).sum() / 1000.
                 loss.backward()
                 torch.nn.utils.clip_grad_norm_(
