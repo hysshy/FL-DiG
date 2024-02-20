@@ -5,7 +5,7 @@ def main(model_config = None):
     modelConfig = {
         "state": "train", # or eval
         "epoch": 200,
-        "batch_size": 20,
+        "batch_size": 2,
         "T": 1000,
         "channel": 128,
         "channel_mult": [1, 2, 3, 4],
@@ -20,16 +20,16 @@ def main(model_config = None):
         "grad_clip": 1.,
         "device": "cuda:0", ### MAKE SURE YOU HAVE A GPU !!!
         "training_load_weight": None,
-        "save_weight_dir": "./test/CheckPoints_cluster_T1000_epoch1000_imgsize64_label2/",
+        "save_weight_dir": "./test/0220/",
         "test_load_weight": "ckpt_199_.pt",
-        "sampled_dir": "./test/2/",
+        "sampled_dir": "./test/0220/",
         "sampledNoisyImgName": "NoisyNoGuidenceImgs4.png",
         "sampledImgName": "SampledNoGuidenceImgs4.png",
         "nrow": 8,
         "data_dir": '/home/chase/shy/DDPM4MINER/classes',
         "num_labels":7,
         "num_shapes":5,
-        "w": 0.2
+        "w": 0.5
         }
     if model_config is not None:
         modelConfig = model_config

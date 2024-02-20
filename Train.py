@@ -1,7 +1,7 @@
 
 import os
 from typing import Dict
-
+import numpy as np
 import torch
 import torch.optim as optim
 from tqdm import tqdm
@@ -59,8 +59,10 @@ def train(modelConfig: Dict):
                 # train
                 optimizer.zero_grad()
                 x_0 = images.to(device)
-                cls_label = cls_label.to(device)
-                shape_label = shape_label.to(device)
+                cls_label = cls_label.to(device) + 1
+                shape_label = shape_label.to(device) + 1
+                if np.random.rand() < 0.1:
+                    labels = torch.zeros_like(labels).to(device)
                 loss = trainer(x_0, cls_label, shape_label).sum() / 1000.
                 loss.backward()
                 torch.nn.utils.clip_grad_norm_(
@@ -95,7 +97,7 @@ def eval(modelConfig: Dict):
             model, modelConfig["beta_1"], modelConfig["beta_T"], modelConfig["T"], w=modelConfig["w"]).to(device)
         # Sampled from standard normal distribution
         savePath = modelConfig["save_weight_dir"]
-        shapes = ['扁平', '工艺品', '碎块', '表面', '石块']
+        shapes = ['碎块', '工艺品', '扁平', '石块', '表面']
         classes = ['bornite_class', 'pyrite_class', 'muscovite_class', 'biotite_class', 'malachite_class', 'chrysocolla_class', 'quartz_class']
         with torch.no_grad():
             for cls_label in range(len(classes)):
@@ -104,11 +106,11 @@ def eval(modelConfig: Dict):
                         cls_labelList = []
                         for i in range(0, modelConfig["batch_size"]):
                             cls_labelList.append(torch.ones(size=[1]).long() * cls_label)
-                        cls_labels = torch.cat(cls_labelList, dim=0).long().to(device)
+                        cls_labels = torch.cat(cls_labelList, dim=0).long().to(device) + 1
                         shape_labelList = []
                         for i in range(0, modelConfig["batch_size"]):
                             shape_labelList.append(torch.ones(size=[1]).long() * shape_label)
-                        shape_labels = torch.cat(shape_labelList, dim=0).long().to(device)
+                        shape_labels = torch.cat(shape_labelList, dim=0).long().to(device) + 1
                         # Sampled from standard normal distribution
                         noisyImage = torch.randn(
                             size=[modelConfig["batch_size"], 3, modelConfig["img_size"], modelConfig["img_size"]],
