@@ -76,7 +76,7 @@ class GaussianDiffusionSampler(nn.Module):
         var = torch.cat([self.posterior_var[1:2], self.betas[1:]])
         var = extract(var, t, x_t.shape)
         eps = self.model(x_t, t, labels, shapes)
-        nonEps = self.model(x_t, t, torch.zeros_like(labels).to(labels.device), torch.zeros_like(shapes).to(shapes.device))
+        nonEps = self.model(x_t, t, torch.zeros_like(labels).to(labels.device), torch.zeros_like(shapes).to(shapes.device)+8)
         eps = (1. + self.w) * eps - self.w * nonEps
         xt_prev_mean = self.predict_xt_prev_mean_from_eps(x_t, t, eps=eps)
 

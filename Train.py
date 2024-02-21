@@ -111,7 +111,7 @@ def eval(modelConfig: Dict):
                         shape_labelList = []
                         for i in range(0, modelConfig["batch_size"]):
                             shape_labelList.append(torch.ones(size=[1]).long() * shape_label)
-                        shape_labels = torch.cat(shape_labelList, dim=0).long().to(device) + 1
+                        shape_labels = torch.cat(shape_labelList, dim=0).long().to(device) + 2 + len(classes)
                         # Sampled from standard normal distribution
                         noisyImage = torch.randn(
                             size=[modelConfig["batch_size"], 3, modelConfig["img_size"], modelConfig["img_size"]],
