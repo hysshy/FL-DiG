@@ -68,7 +68,7 @@ class DownSample(nn.Module):
         init.xavier_uniform_(self.main.weight)
         init.zeros_(self.main.bias)
 
-    def forward(self, x, temb, c_cemb, s_cemb):
+    def forward(self, x, temb, c_cemb):
         x = self.main(x)
         return x
 
@@ -83,7 +83,7 @@ class UpSample(nn.Module):
         init.xavier_uniform_(self.main.weight)
         init.zeros_(self.main.bias)
 
-    def forward(self, x, temb, c_cemb, s_cemb):
+    def forward(self, x, temb, c_cemb):
         _, _, H, W = x.shape
         x = F.interpolate(
             x, scale_factor=2, mode='nearest')
@@ -177,11 +177,13 @@ class ResBlock(nn.Module):
                 init.zeros_(module.bias)
         init.xavier_uniform_(self.block2[-1].weight, gain=1e-5)
 
-    def forward(self, x, temb, c_cemb, s_cemb):
+    def forward(self, x, temb, cemb):
         h = self.block1(x)
         h += self.temb_proj(temb)[:, :, None, None]
-        h += self.cond_proj1(c_cemb)[:, :, None, None]
-        h += self.cond_proj2(s_cemb)[:, :, None, None]
+        # h += self.cond_proj1(c_cemb)[:, :, None, None]
+        h1 = self.cond_proj2(cemb)
+        h1 = torch.sum(h1,dim=0)
+        h += h1[:, :, None, None]
         h = self.block2(h)
 
         h = h + self.shortcut(x)
@@ -195,7 +197,7 @@ class UNet(nn.Module):
         assert all([i < len(ch_mult) for i in attn]), 'attn index out of bound'
         tdim = ch * 4
         self.time_embedding = TimeEmbedding(T, ch, tdim)
-        self.cond_embedding1 = ConditionalEmbedding(num_labels, ch, tdim)
+        # self.cond_embedding1 = ConditionalEmbedding(num_labels, ch, tdim)
         self.cond_embedding2 = ConditionalEmbedding(num_shapes, ch, tdim)
 
         self.head = nn.Conv2d(3, ch, kernel_size=3, stride=1, padding=1)
@@ -247,22 +249,25 @@ class UNet(nn.Module):
     def forward(self, x, t, cls_label, shape_label):
         # Timestep embedding
         temb = self.time_embedding(t)
-        c_cemb = self.cond_embedding1(cls_label)
-        s_cemb = self.cond_embedding2(shape_label)
+        label_vector = torch.stack([cls_label, shape_label])
+        # label_vector = torch.LongTensor(label_vector)
+        # c_cemb = self.cond_embedding1(cls_label)
+        # s_cemb = self.cond_embedding2(shape_label)
+        cemb = self.cond_embedding2(label_vector)
         # Downsampling
         h = self.head(x)
         hs = [h]
         for layer in self.downblocks:
-            h = layer(h, temb, c_cemb, s_cemb)
+            h = layer(h, temb, cemb)
             hs.append(h)
         # Middle
         for layer in self.middleblocks:
-            h = layer(h, temb, c_cemb, s_cemb)
+            h = layer(h, temb, cemb)
         # Upsampling
         for layer in self.upblocks:
             if isinstance(layer, ResBlock):
                 h = torch.cat([h, hs.pop()], dim=1)
-            h = layer(h, temb, c_cemb, s_cemb)
+            h = layer(h, temb, cemb)
         h = self.tail(h)
 
         assert len(hs) == 0
