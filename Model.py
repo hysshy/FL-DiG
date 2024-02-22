@@ -68,7 +68,7 @@ class DownSample(nn.Module):
         init.xavier_uniform_(self.main.weight)
         init.zeros_(self.main.bias)
 
-    def forward(self, x, temb, c_cemb):
+    def forward(self, x, temb, c_cemb, s_cemb):
         x = self.main(x)
         return x
 
@@ -83,7 +83,7 @@ class UpSample(nn.Module):
         init.xavier_uniform_(self.main.weight)
         init.zeros_(self.main.bias)
 
-    def forward(self, x, temb, c_cemb):
+    def forward(self, x, temb, c_cemb, s_cemb):
         _, _, H, W = x.shape
         x = F.interpolate(
             x, scale_factor=2, mode='nearest')
@@ -130,8 +130,9 @@ class AttnBlock(nn.Module):
 
 
 class ResBlock(nn.Module):
-    def __init__(self, in_ch, out_ch, tdim, dropout, attn=True):
+    def __init__(self, in_ch, out_ch, tdim, dropout, attn=True, embedding_type=0):
         super().__init__()
+        self.embedding_type = embedding_type
         self.block1 = nn.Sequential(
             nn.GroupNorm(32, in_ch),
             Swish(),
@@ -177,13 +178,16 @@ class ResBlock(nn.Module):
                 init.zeros_(module.bias)
         init.xavier_uniform_(self.block2[-1].weight, gain=1e-5)
 
-    def forward(self, x, temb, cemb):
+    def forward(self, x, temb, cemb, s_cemb):
         h = self.block1(x)
         h += self.temb_proj(temb)[:, :, None, None]
-        # h += self.cond_proj1(c_cemb)[:, :, None, None]
-        h1 = self.cond_proj2(cemb)
-        h1 = torch.sum(h1,dim=0)
-        h += h1[:, :, None, None]
+        if self.embedding_type ==0:
+            h += self.cond_proj1(cemb)[:, :, None, None]
+            h += self.cond_proj1(s_cemb)[:, :, None, None]
+        else:
+            h1 = self.cond_proj2(cemb)
+            h1 = torch.sum(h1,dim=0)
+            h += h1[:, :, None, None]
         h = self.block2(h)
 
         h = h + self.shortcut(x)
@@ -192,13 +196,17 @@ class ResBlock(nn.Module):
 
 
 class UNet(nn.Module):
-    def __init__(self, T, num_labels, num_shapes, ch, ch_mult, attn, num_res_blocks, dropout):
+    def __init__(self, T, num_labels, num_shapes, embedding_type, ch, ch_mult, attn, num_res_blocks, dropout):
         super().__init__()
         assert all([i < len(ch_mult) for i in attn]), 'attn index out of bound'
         tdim = ch * 4
         self.time_embedding = TimeEmbedding(T, ch, tdim)
-        # self.cond_embedding1 = ConditionalEmbedding(num_labels, ch, tdim)
-        self.cond_embedding2 = ConditionalEmbedding(num_shapes, ch, tdim)
+        self.embedding_type = embedding_type
+        if self.embedding_type == 0:
+            self.cond_embedding1 = ConditionalEmbedding(num_labels, ch, tdim)
+            self.cond_embedding2 = ConditionalEmbedding(num_shapes, ch, tdim)
+        else:
+            self.cond_embedding = ConditionalEmbedding(num_shapes, ch, tdim)
 
         self.head = nn.Conv2d(3, ch, kernel_size=3, stride=1, padding=1)
         self.downblocks = nn.ModuleList()
@@ -209,7 +217,7 @@ class UNet(nn.Module):
             for _ in range(num_res_blocks):
                 self.downblocks.append(ResBlock(
                     in_ch=now_ch, out_ch=out_ch, tdim=tdim,
-                    dropout=dropout, attn=(i in attn)))
+                    dropout=dropout, attn=(i in attn), embedding_type=self.embedding_type))
                 now_ch = out_ch
                 chs.append(now_ch)
             if i != len(ch_mult) - 1:
@@ -217,8 +225,8 @@ class UNet(nn.Module):
                 chs.append(now_ch)
 
         self.middleblocks = nn.ModuleList([
-            ResBlock(now_ch, now_ch, tdim, dropout, attn=True),
-            ResBlock(now_ch, now_ch, tdim, dropout, attn=False),
+            ResBlock(now_ch, now_ch, tdim, dropout, attn=True, embedding_type=self.embedding_type),
+            ResBlock(now_ch, now_ch, tdim, dropout, attn=False, embedding_type=self.embedding_type),
         ])
 
         self.upblocks = nn.ModuleList()
@@ -227,7 +235,7 @@ class UNet(nn.Module):
             for _ in range(num_res_blocks + 1):
                 self.upblocks.append(ResBlock(
                     in_ch=chs.pop() + now_ch, out_ch=out_ch, tdim=tdim,
-                    dropout=dropout, attn=(i in attn)))
+                    dropout=dropout, attn=(i in attn), embedding_type=self.embedding_type))
                 now_ch = out_ch
             if i != 0:
                 self.upblocks.append(UpSample(now_ch))
@@ -249,25 +257,27 @@ class UNet(nn.Module):
     def forward(self, x, t, cls_label, shape_label):
         # Timestep embedding
         temb = self.time_embedding(t)
-        label_vector = torch.stack([cls_label, shape_label])
-        # label_vector = torch.LongTensor(label_vector)
-        # c_cemb = self.cond_embedding1(cls_label)
-        # s_cemb = self.cond_embedding2(shape_label)
-        cemb = self.cond_embedding2(label_vector)
+        if self.embedding_type == 0:
+            cemb = self.cond_embedding1(cls_label)
+            s_cemb = self.cond_embedding2(shape_label)
+        else:
+            label_vector = torch.stack([cls_label, shape_label])
+            cemb = self.cond_embedding(label_vector)
+            s_cemb = None
         # Downsampling
         h = self.head(x)
         hs = [h]
         for layer in self.downblocks:
-            h = layer(h, temb, cemb)
+            h = layer(h, temb, cemb, s_cemb)
             hs.append(h)
         # Middle
         for layer in self.middleblocks:
-            h = layer(h, temb, cemb)
+            h = layer(h, temb, cemb, s_cemb)
         # Upsampling
         for layer in self.upblocks:
             if isinstance(layer, ResBlock):
                 h = torch.cat([h, hs.pop()], dim=1)
-            h = layer(h, temb, cemb)
+            h = layer(h, temb, cemb, s_cemb)
         h = self.tail(h)
 
         assert len(hs) == 0

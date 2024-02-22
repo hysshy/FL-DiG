@@ -1,9 +1,9 @@
 from Train import train, eval
 import threading
 
-def main(model_config = None, device = 'cuda:0', label_id = None):
+def main(state='train', device = 'cuda:0', label_id = None):
     modelConfig = {
-        "state": "eval", # or eval
+        "state": state, # or eval
         "epoch": 200,
         "batch_size": 5,
         "T": 1000,
@@ -29,12 +29,11 @@ def main(model_config = None, device = 'cuda:0', label_id = None):
         "data_dir": '/home/chase/shy/DDPM4MINER/data/ddpm_miner',
         "num_labels":7,
         "num_shapes":13,
+        'embedding_type':1,
         "w": 0.2,
         'label_id': label_id,
         'repeat': 1
         }
-    if model_config is not None:
-        modelConfig = model_config
     if modelConfig["state"] == "train":
         train(modelConfig)
     else:
@@ -42,8 +41,12 @@ def main(model_config = None, device = 'cuda:0', label_id = None):
 
 
 if __name__ == '__main__':
-    for i in range(2):
-        t = threading.Thread(target=main, args=(None, 'cuda:'+str(i), i))
-        t.start()
-    t.join()
+    state = 'train'
+    if state == 'train':
+        main(state=state)
+    else:
+        for i in range(2):
+            t = threading.Thread(target=main, args=(state, 'cuda:'+str(i), i))
+            t.start()
+        t.join()
         # main(None, 'cuda:'+str(i), i)
