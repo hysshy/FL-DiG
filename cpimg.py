@@ -13,7 +13,7 @@ import cv2
 
 if __name__ == '__main__':
     imgPath = '/home/chase/shy/DDPM4MINER/data/ddpm_miner'
-    MaxNum = 300
+    MaxNum = 60
     for subPath in os.listdir(imgPath):
         for subsubPath in os.listdir(imgPath+'/'+subPath):
             imgNum = len(os.listdir(imgPath+'/'+subPath+'/'+subsubPath))

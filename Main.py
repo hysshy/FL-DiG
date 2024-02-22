@@ -1,11 +1,11 @@
 from Train import train, eval
+import threading
 
-
-def main(model_config = None):
+def main(model_config = None, device = 'cuda:0', label_id = None):
     modelConfig = {
-        "state": "train", # or eval
+        "state": "eval", # or eval
         "epoch": 200,
-        "batch_size": 20,
+        "batch_size": 5,
         "T": 1000,
         "channel": 128,
         "channel_mult": [1, 2, 3, 4],
@@ -18,18 +18,20 @@ def main(model_config = None):
         "beta_T": 0.02,
         "img_size": 64,
         "grad_clip": 1.,
-        "device": "cuda:0", ### MAKE SURE YOU HAVE A GPU !!!
+        "device": device, ### MAKE SURE YOU HAVE A GPU !!!
         "training_load_weight": None,
-        "save_weight_dir": "./test/0220_2/",
+        "save_weight_dir": "./test/0221_1/",
         "test_load_weight": "ckpt_199_.pt",
-        "sampled_dir": "./test/0220_2/",
+        "sampled_dir": "./test/0221_1/",
         "sampledNoisyImgName": "NoisyNoGuidenceImgs4.png",
         "sampledImgName": "SampledNoGuidenceImgs4.png",
         "nrow": 8,
         "data_dir": '/home/chase/shy/DDPM4MINER/data/ddpm_miner',
         "num_labels":7,
         "num_shapes":13,
-        "w": 0.2
+        "w": 0.2,
+        'label_id': label_id,
+        'repeat': 1
         }
     if model_config is not None:
         modelConfig = model_config
@@ -40,4 +42,8 @@ def main(model_config = None):
 
 
 if __name__ == '__main__':
-    main()
+    for i in range(2):
+        t = threading.Thread(target=main, args=(None, 'cuda:'+str(i), i))
+        t.start()
+    t.join()
+        # main(None, 'cuda:'+str(i), i)

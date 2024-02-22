@@ -13,19 +13,19 @@ learning_rate = 0.01 # 学习率
 
 transform_train = transforms.Compose([
     # transforms.RandomCrop(64, padding=4), # 随机裁剪
-    transforms.Resize(size=(64, 64), interpolation=3),
+    transforms.Resize(size=(128, 128), interpolation=3),
     transforms.RandomHorizontalFlip(), # 随机水平翻转
     transforms.ToTensor(), # 转换为张量
     transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)), # 归一化
 ])
 
 transform_test = transforms.Compose([
-    transforms.Resize(size=(64, 64), interpolation=3),
+    transforms.Resize(size=(128, 128), interpolation=3),
     transforms.ToTensor(), # 转换为张量
     transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)), # 归一化
 ])
-train_imgPath = '/home/chase/shy/DDPM4MINER/Miner_train'
-test_imgPath = '/home/chase/shy/DDPM4MINER/Miner_test'
+train_imgPath = '/home/chase/shy/DDPM4MINER/data/Miner_train'
+test_imgPath = '/home/chase/shy/DDPM4MINER/data/Miner_test'
 # 加载数据集
 trainset = datasets.ImageFolder(train_imgPath, transform_train)
 # trainset = torchvision.datasets.CIFAR10(root='./data', train=True, download=True, transform=transform_train) # 训练集
@@ -42,7 +42,7 @@ classes = ['biotite', 'bornite', 'chrysocolla', 'malachite', 'muscovite', 'pyrit
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 # 定义模型
-model = torchvision.models.resnet18(pretrained=True) # 加载预训练的ResNet18模型
+model = torchvision.models.resnet50(pretrained=True) # 加载预训练的ResNet18模型
 model.fc = torch.nn.Linear(model.fc.in_features, num_classes) # 修改全连接层的输出
 model.to(device) # 将模型放到设备上
 

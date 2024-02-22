@@ -102,8 +102,10 @@ def eval(modelConfig: Dict):
         classes = ['bornite_class', 'pyrite_class', 'muscovite_class', 'biotite_class', 'malachite_class', 'chrysocolla_class', 'quartz_class']
         with torch.no_grad():
             for cls_label in range(len(classes)):
-                for shape_label in range(len(shapes)):
-                    for m in range(1):
+                if modelConfig['label_id'] is not None:
+                    cls_label = modelConfig['label_id']
+                for m in range(modelConfig['repeat']):
+                    for shape_label in range(len(shapes)):
                         cls_labelList = []
                         for i in range(0, modelConfig["batch_size"]):
                             cls_labelList.append(torch.ones(size=[1]).long() * cls_label)
@@ -129,6 +131,8 @@ def eval(modelConfig: Dict):
                             im = Image.fromarray(ndarr)
                             im.save(savePath + '/' + classes[cls_label] + '/' + shapes[shape_label] + '/' + str(m * modelConfig["batch_size"] + i) + '.jpg',
                                     format=None)
+                if modelConfig['label_id'] is not None:
+                    break
         # noisyImage = torch.randn(
         #     size=[modelConfig["batch_size"], 3, modelConfig["img_size"], modelConfig["img_size"]], device=device)
         # saveNoisy = torch.clamp(noisyImage * 0.5 + 0.5, 0, 1)
