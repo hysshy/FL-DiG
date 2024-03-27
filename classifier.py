@@ -6,7 +6,7 @@ import torch.optim.lr_scheduler as lr_scheduler
 # 定义超参数
 batch_size = 32 # 批次大小
 num_classes = 7 # 分类数目，根据数据集修改
-num_epochs = 100 # 训练轮数
+num_epochs = 30 # 训练轮数
 learning_rate = 0.01 # 学习率
 
 # 定义数据变换
@@ -16,15 +16,15 @@ transform_train = transforms.Compose([
     transforms.Resize(size=(128, 128), interpolation=3),
     transforms.RandomHorizontalFlip(), # 随机水平翻转
     transforms.ToTensor(), # 转换为张量
-    transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)), # 归一化
+    transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)), # 归一化
 ])
 
 transform_test = transforms.Compose([
     transforms.Resize(size=(128, 128), interpolation=3),
     transforms.ToTensor(), # 转换为张量
-    transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)), # 归一化
+    transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)), # 归一化
 ])
-train_imgPath = '/home/chase/shy/DDPM4MINER/data/Miner_train'
+train_imgPath = '/home/chase/shy/DDPM4MINER/data/Miner_train_addddpm'
 test_imgPath = '/home/chase/shy/DDPM4MINER/data/Miner_test'
 # 加载数据集
 trainset = datasets.ImageFolder(train_imgPath, transform_train)
@@ -39,17 +39,19 @@ testloader = torch.utils.data.DataLoader(testset, batch_size=batch_size, shuffle
 classes = ['biotite', 'bornite', 'chrysocolla', 'malachite', 'muscovite', 'pyrite', 'quartz']
 
 # 定义设备
-device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+device = torch.device("cuda:1" if torch.cuda.is_available() else "cpu")
 
 # 定义模型
-model = torchvision.models.resnet50(pretrained=True) # 加载预训练的ResNet18模型
-model.fc = torch.nn.Linear(model.fc.in_features, num_classes) # 修改全连接层的输出
+model = torchvision.models.densenet121(pretrained=True) # 加载预训练的ResNet18模型
+# model.fc = torch.nn.Linear(model.fc.in_features, num_classes) # 修改全连接层的输出
+model.classifier = torch.nn.Linear(model.classifier.in_features, num_classes) # 修改全连接层的输出
+# model.classifier[6] = torch.nn.Linear(model.classifier[6].in_features, num_classes) # 修改全连接层的输出
 model.to(device) # 将模型放到设备上
 
 # 定义损失函数和优化器
 criterion = torch.nn.CrossEntropyLoss() # 交叉熵损失函数
 optimizer = torch.optim.SGD(model.parameters(), lr=learning_rate, momentum=0.9) # 随机梯度下降优化器
-scheduler = lr_scheduler.StepLR(optimizer, step_size=30, gamma=0.1)
+scheduler = lr_scheduler.StepLR(optimizer, step_size=10, gamma=0.1)
 # 定义训练函数
 def train(epoch):
     model.train() # 切换到训练模式
@@ -82,7 +84,7 @@ def test():
             _, predicted = torch.max(outputs.data, 1) # 获取预测结果
             total += labels.size(0) # 累加总数
             correct += (predicted == labels).sum().item() # 累加正确数
-    print('Accuracy of the network on the test images: %d %%' % (100 * correct / total)) # 打印准确率
+    print('Accuracy of the network on the test images: %d %%' % (10000 * correct / total)) # 打印准确率
 
 # 开始训练和测试
 for epoch in range(num_epochs):
