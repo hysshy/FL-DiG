@@ -128,9 +128,31 @@ class AttnBlock(nn.Module):
 
         return x + h
 
+class MSATAM(nn.Module):
+    def __init__(self, in_ch, num_scales=4, kernel_sizes = (1,3)):
+        super().__init__()
+        self.conv_layers = nn.ModuleList([nn.Conv2d(in_ch, in_ch, kernel_size=k, padding=k//2) for k in kernel_sizes])
+        self.fc = nn.Linear(in_ch, in_ch)
+        self.relu = nn.ReLU(inplace=True)
+        self.sigmod = nn.Sigmoid()
+        self.gap = nn.AdaptiveAvgPool2d(1)
+
+    def forward(self, x):
+        B, C, H, W = x.shape
+
+        scale_features = [conv(x) for conv in self.conv_layers]
+        scale_features = sum(scale_features)
+        # scale_features = torch.cat(scale_features, dim=1)
+
+        # gap = self.gap(scale_features)
+
+        adaptive_threth = self.fc(self.relu(torch.mean(scale_features, dim=(2,3))))
+        adaptive_threth = self.sigmod(adaptive_threth).view(B, C, 1, 1)
+        attention_map = self.sigmod(scale_features*adaptive_threth)
+        return  x*attention_map
 
 class ResBlock(nn.Module):
-    def __init__(self, in_ch, out_ch, tdim, dropout, attn=True, embedding_type=0):
+    def __init__(self, in_ch, out_ch, tdim, dropout, attn=True, attn_type = 'MSATAM', embedding_type=0):
         super().__init__()
         self.embedding_type = embedding_type
         self.block1 = nn.Sequential(
@@ -166,7 +188,10 @@ class ResBlock(nn.Module):
         else:
             self.shortcut = nn.Identity()
         if attn:
-            self.attn = AttnBlock(out_ch)
+            if attn_type == 'MSATAM':
+                self.attn = MSATAM(out_ch)
+            else:
+                self.attn = AttnBlock(out_ch)
         else:
             self.attn = nn.Identity()
         self.initialize()
@@ -196,7 +221,7 @@ class ResBlock(nn.Module):
 
 
 class UNet(nn.Module):
-    def __init__(self, T, num_labels, num_shapes, embedding_type, ch, ch_mult, attn, num_res_blocks, dropout):
+    def __init__(self, T, num_labels, num_shapes, embedding_type, ch, ch_mult, attn, attn_type, num_res_blocks, dropout):
         super().__init__()
         assert all([i < len(ch_mult) for i in attn]), 'attn index out of bound'
         tdim = ch * 4
@@ -217,7 +242,7 @@ class UNet(nn.Module):
             for _ in range(num_res_blocks):
                 self.downblocks.append(ResBlock(
                     in_ch=now_ch, out_ch=out_ch, tdim=tdim,
-                    dropout=dropout, attn=(i in attn), embedding_type=self.embedding_type))
+                    dropout=dropout, attn=(i in attn), attn_type=attn_type, embedding_type=self.embedding_type))
                 now_ch = out_ch
                 chs.append(now_ch)
             if i != len(ch_mult) - 1:
@@ -225,8 +250,8 @@ class UNet(nn.Module):
                 chs.append(now_ch)
 
         self.middleblocks = nn.ModuleList([
-            ResBlock(now_ch, now_ch, tdim, dropout, attn=True, embedding_type=self.embedding_type),
-            ResBlock(now_ch, now_ch, tdim, dropout, attn=False, embedding_type=self.embedding_type),
+            ResBlock(now_ch, now_ch, tdim, dropout, attn=True, attn_type=attn_type, embedding_type=self.embedding_type),
+            ResBlock(now_ch, now_ch, tdim, dropout, attn=False, attn_type=attn_type, embedding_type=self.embedding_type),
         ])
 
         self.upblocks = nn.ModuleList()
@@ -235,7 +260,7 @@ class UNet(nn.Module):
             for _ in range(num_res_blocks + 1):
                 self.upblocks.append(ResBlock(
                     in_ch=chs.pop() + now_ch, out_ch=out_ch, tdim=tdim,
-                    dropout=dropout, attn=(i in attn), embedding_type=self.embedding_type))
+                    dropout=dropout, attn=(i in attn), attn_type=attn_type, embedding_type=self.embedding_type))
                 now_ch = out_ch
             if i != 0:
                 self.upblocks.append(UpSample(now_ch))
