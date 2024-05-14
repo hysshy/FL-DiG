@@ -3,9 +3,9 @@ import shutil
 import random
 
 if __name__ == '__main__':
-    imgPath = '/home/chase/shy/DGDA/data/NEU-CLS/orimg'
-    trainPath = '/home/chase/shy/DGDA/data/NEU-CLS/train2'
-    testPath = '/home/chase/shy/DGDA/data/NEU-CLS/test2'
+    imgPath = '/home/chase/shy/FedDGDA/data/NEU-CLS/orimg'
+    trainPath = '/home/chase/shy/FedDGDA/data/NEU-CLS/train2'
+    testPath = '/home/chase/shy/FedDGDA/data/NEU-CLS/test2'
     thr = 0.5
     for cls in os.listdir(imgPath):
         if not os.path.exists(trainPath+'/'+cls):

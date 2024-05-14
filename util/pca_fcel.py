@@ -7,8 +7,8 @@ from PIL import Image
 from sklearn.decomposition import PCA
 
 # 定义文件夹路径，聚类数目，模糊指数
-folder = "/home/chase/shy/DGDA/data/MT/train"
-savePath = '/home/chase/shy/DGDA/data/MT/F-train'# 存放图片的文件夹
+folder = "/home/chase/shy/FedDGDA/data/MT/train"
+savePath = '/home/chase/shy/FedDGDA/data/MT/F-train'# 存放图片的文件夹
 
 def embeding(folder, savePath):
     c = 5 # 聚类数目，根据图片的特征和数量选择

@@ -22,8 +22,8 @@ transform = transforms.Compose([
     transforms.ToTensor(),
     transforms.Normalize((0.5,0.5,0.5), (0.5,0.5,0.5))
 ])
-train_imgPath = '/home/chase/shy/DGDA/data/MT/train'
-test_imgPath = '/home/chase/shy/DGDA/data/MT/test'
+train_imgPath = '/home/chase/shy/FedDGDA/data/MT/train'
+test_imgPath = '/home/chase/shy/FedDGDA/data/MT/test'
 train_dataset = datasets.ImageFolder(train_imgPath, transform)
 test_dataset = datasets.ImageFolder(test_imgPath, transform)
 
