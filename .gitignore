@@ -22,6 +22,7 @@ sdist/
 test/
 var/
 wheels/
+result/
 *.egg-info/
 .installed.cfg
 *.egg

@@ -128,70 +128,41 @@ class AttnBlock(nn.Module):
 
         return x + h
 
-class MSATAM(nn.Module):
-    def __init__(self, in_ch, num_scales=4, kernel_sizes = (1,3)):
+class AEN(nn.Module):
+    def __init__(self, in_ch, tdim, dropout, attn=True, pca_fcel=False, embedding_type=0):
         super().__init__()
-        self.conv_layers = nn.ModuleList([nn.Conv2d(in_ch, in_ch, kernel_size=k, padding=k//2) for k in kernel_sizes])
-        self.fc = nn.Linear(in_ch, in_ch)
-        self.relu = nn.ReLU(inplace=True)
-        self.sigmod = nn.Sigmoid()
-        self.gap = nn.AdaptiveAvgPool2d(1)
-
-    def forward(self, x):
-        B, C, H, W = x.shape
-
-        scale_features = [conv(x) for conv in self.conv_layers]
-        scale_features = sum(scale_features)
-        # scale_features = torch.cat(scale_features, dim=1)
-
-        # gap = self.gap(scale_features)
-
-        adaptive_threth = self.fc(self.relu(torch.mean(scale_features, dim=(2,3))))
-        adaptive_threth = self.sigmod(adaptive_threth).view(B, C, 1, 1)
-        attention_map = self.sigmod(scale_features*adaptive_threth)
-        return  x*attention_map
-
-class ResBlock(nn.Module):
-    def __init__(self, in_ch, out_ch, tdim, dropout, attn=True, attn_type = 'MSATAM', embedding_type=0):
-        super().__init__()
+        self.pca_fcel = pca_fcel
         self.embedding_type = embedding_type
         self.block1 = nn.Sequential(
             nn.GroupNorm(32, in_ch),
             Swish(),
-            nn.Conv2d(in_ch, out_ch, 3, stride=1, padding=1),
+            nn.Conv2d(in_ch, in_ch, 3, stride=1, padding=1),
             nn.GELU(),
-            nn.Conv2d(out_ch, out_ch, 1, stride=1),
+            nn.Conv2d(in_ch, in_ch, 1, stride=1),
 
         )
         self.temb_proj = nn.Sequential(
             Swish(),
-            nn.Linear(tdim, out_ch),
+            nn.Linear(tdim, in_ch),
         )
         self.cond_proj1 = nn.Sequential(
             Swish(),
-            nn.Linear(tdim, out_ch),
+            nn.Linear(tdim, in_ch),
         )
         self.cond_proj2 = nn.Sequential(
             Swish(),
-            nn.Linear(tdim, out_ch),
+            nn.Linear(tdim, in_ch),
         )
         self.block2 = nn.Sequential(
-            nn.GroupNorm(32, out_ch),
+            nn.GroupNorm(32, in_ch),
             Swish(),
             nn.Dropout(dropout),
-            nn.Conv2d(out_ch, out_ch, 3, stride=1, padding=1),
+            nn.Conv2d(in_ch, in_ch, 3, stride=1, padding=1),
             nn.GELU(),
-            nn.Conv2d(out_ch, out_ch, 1, stride=1),
+            nn.Conv2d(in_ch, in_ch, 1, stride=1),
         )
-        if in_ch != out_ch:
-            self.shortcut = nn.Conv2d(in_ch, out_ch, 1, stride=1, padding=0)
-        else:
-            self.shortcut = nn.Identity()
         if attn:
-            if attn_type == 'MSATAM':
-                self.attn = MSATAM(out_ch)
-            else:
-                self.attn = AttnBlock(out_ch)
+            self.attn = AttnBlock(in_ch)
         else:
             self.attn = nn.Identity()
         self.initialize()
@@ -206,32 +177,73 @@ class ResBlock(nn.Module):
     def forward(self, x, temb, cemb, s_cemb):
         h = self.block1(x)
         h += self.temb_proj(temb)[:, :, None, None]
-        if self.embedding_type ==0:
-            h += self.cond_proj1(cemb)[:, :, None, None]
-            h += self.cond_proj1(s_cemb)[:, :, None, None]
+        if self.pca_fcel:
+            if self.embedding_type ==0:
+                h += self.cond_proj1(cemb)[:, :, None, None]
+                h += self.cond_proj1(s_cemb)[:, :, None, None]
+            else:
+                h1 = self.cond_proj2(cemb)
+                h1 = torch.sum(h1,dim=0)
+                h += h1[:, :, None, None]
         else:
-            h1 = self.cond_proj2(cemb)
-            h1 = torch.sum(h1,dim=0)
-            h += h1[:, :, None, None]
+            h += self.cond_proj1(cemb)[:, :, None, None]
         h = self.block2(h)
-
-        h = h + self.shortcut(x)
         h = self.attn(h)
+        return h
+
+class cond_embed(nn.Module):
+    def __init__(self, in_ch, tdim):
+        super().__init__()
+        self.temb_proj = nn.Sequential(
+            Swish(),
+            nn.Linear(tdim, in_ch),
+        )
+        self.cond_proj = nn.Sequential(
+            Swish(),
+            nn.Linear(tdim, in_ch),
+        )
+    def forward(self, x, temb, cemb, s_cemb):
+        x += self.temb_proj(temb)[:, :, None, None]
+        x += self.cond_proj(cemb)[:, :, None, None]
+        return x
+
+class ResBlock(nn.Module):
+    def __init__(self, in_ch, out_ch, tdim, dropout, attn=True, aen = True, pca_fcel=False, embedding_type=0):
+        super().__init__()
+        self.pca_fcel = pca_fcel
+        self.embedding_type = embedding_type
+        if aen:
+            self.aen = AEN(in_ch, tdim, dropout, attn, pca_fcel, embedding_type)
+        else:
+            self.aen = cond_embed(in_ch, tdim)
+        if in_ch != out_ch:
+            self.shortcut = nn.Conv2d(in_ch, out_ch, 1, stride=1, padding=0)
+        else:
+            self.shortcut = nn.Identity()
+
+    def forward(self, x, temb, cemb, s_cemb):
+        h = self.aen(x, temb, cemb, s_cemb)
+        h = self.shortcut(h)
         return h
 
 
 class UNet(nn.Module):
-    def __init__(self, T, num_labels, num_shapes, embedding_type, ch, ch_mult, attn, attn_type, num_res_blocks, dropout):
+    def __init__(self, T, num_labels, num_shapes, pca_fcel, embedding_type, ch, ch_mult, attn, aen, num_res_blocks, dropout):
         super().__init__()
         assert all([i < len(ch_mult) for i in attn]), 'attn index out of bound'
         tdim = ch * 4
         self.time_embedding = TimeEmbedding(T, ch, tdim)
+        self.pca_fcel = pca_fcel
+        self.aen = aen
         self.embedding_type = embedding_type
-        if self.embedding_type == 0:
-            self.cond_embedding1 = ConditionalEmbedding(num_labels, ch, tdim)
-            self.cond_embedding2 = ConditionalEmbedding(num_shapes, ch, tdim)
+        if self.pca_fcel:
+            if self.embedding_type == 0:
+                self.cond_embedding1 = ConditionalEmbedding(num_labels, ch, tdim)
+                self.cond_embedding2 = ConditionalEmbedding(num_shapes, ch, tdim)
+            else:
+                self.cond_embedding = ConditionalEmbedding(num_shapes, ch, tdim)
         else:
-            self.cond_embedding = ConditionalEmbedding(num_shapes, ch, tdim)
+            self.cond_embedding = ConditionalEmbedding(num_labels, ch, tdim)
 
         self.head = nn.Conv2d(3, ch, kernel_size=3, stride=1, padding=1)
         self.downblocks = nn.ModuleList()
@@ -242,7 +254,7 @@ class UNet(nn.Module):
             for _ in range(num_res_blocks):
                 self.downblocks.append(ResBlock(
                     in_ch=now_ch, out_ch=out_ch, tdim=tdim,
-                    dropout=dropout, attn=(i in attn), attn_type=attn_type, embedding_type=self.embedding_type))
+                    dropout=dropout, attn=(i in attn), aen=self.aen, pca_fcel=self.pca_fcel, embedding_type=self.embedding_type))
                 now_ch = out_ch
                 chs.append(now_ch)
             if i != len(ch_mult) - 1:
@@ -250,8 +262,8 @@ class UNet(nn.Module):
                 chs.append(now_ch)
 
         self.middleblocks = nn.ModuleList([
-            ResBlock(now_ch, now_ch, tdim, dropout, attn=True, attn_type=attn_type, embedding_type=self.embedding_type),
-            ResBlock(now_ch, now_ch, tdim, dropout, attn=False, attn_type=attn_type, embedding_type=self.embedding_type),
+            ResBlock(now_ch, now_ch, tdim, dropout, attn=True, aen=self.aen,  pca_fcel=self.pca_fcel, embedding_type=self.embedding_type),
+            ResBlock(now_ch, now_ch, tdim, dropout, attn=False, aen=self.aen,  pca_fcel=self.pca_fcel, embedding_type=self.embedding_type),
         ])
 
         self.upblocks = nn.ModuleList()
@@ -260,7 +272,7 @@ class UNet(nn.Module):
             for _ in range(num_res_blocks + 1):
                 self.upblocks.append(ResBlock(
                     in_ch=chs.pop() + now_ch, out_ch=out_ch, tdim=tdim,
-                    dropout=dropout, attn=(i in attn), attn_type=attn_type, embedding_type=self.embedding_type))
+                    dropout=dropout, attn=(i in attn), aen=self.aen,  pca_fcel=self.pca_fcel, embedding_type=self.embedding_type))
                 now_ch = out_ch
             if i != 0:
                 self.upblocks.append(UpSample(now_ch))
@@ -282,12 +294,16 @@ class UNet(nn.Module):
     def forward(self, x, t, cls_label, shape_label):
         # Timestep embedding
         temb = self.time_embedding(t)
-        if self.embedding_type == 0:
-            cemb = self.cond_embedding1(cls_label)
-            s_cemb = self.cond_embedding2(shape_label)
+        if self.pca_fcel:
+            if self.embedding_type == 0:
+                cemb = self.cond_embedding1(cls_label)
+                s_cemb = self.cond_embedding2(shape_label)
+            else:
+                label_vector = torch.stack([cls_label, shape_label])
+                cemb = self.cond_embedding(label_vector)
+                s_cemb = None
         else:
-            label_vector = torch.stack([cls_label, shape_label])
-            cemb = self.cond_embedding(label_vector)
+            cemb = self.cond_embedding(cls_label)
             s_cemb = None
         # Downsampling
         h = self.head(x)

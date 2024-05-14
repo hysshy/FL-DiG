@@ -35,6 +35,8 @@ def train(modelConfig: Dict):
         transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),
     ])
     dataset = MultiLabelDataset(modelConfig["data_dir"], data_transforms)
+    print(dataset.label1list)
+    print(dataset.label2list)
     dataloader = DataLoader(
         dataset, batch_size=modelConfig["batch_size"], shuffle=True, num_workers=4, drop_last=True, pin_memory=True)
     # model setup
@@ -88,7 +90,9 @@ def eval(modelConfig: Dict):
     # load model and evaluate
     with torch.no_grad():
         device = torch.device(modelConfig["device"])
-        model = UNet(T=modelConfig["T"], num_labels=modelConfig['num_labels'], num_shapes=modelConfig["num_shapes"], embedding_type=modelConfig['embedding_type'], ch=modelConfig["channel"], ch_mult=modelConfig["channel_mult"], attn=modelConfig["attn"],
+        model = UNet(T=modelConfig["T"], num_labels=modelConfig['num_labels'], num_shapes=modelConfig["num_shapes"],
+                     embedding_type=modelConfig['embedding_type'], ch=modelConfig["channel"], ch_mult=modelConfig["channel_mult"],
+                     attn=modelConfig["attn"], attn_type=modelConfig['attn_type'],
                      num_res_blocks=modelConfig["num_res_blocks"], dropout=0.)
         ckpt = torch.load(os.path.join(
             modelConfig["save_weight_dir"], modelConfig["test_load_weight"]), map_location=device)
@@ -99,8 +103,12 @@ def eval(modelConfig: Dict):
             model, modelConfig["beta_1"], modelConfig["beta_T"], modelConfig["T"], w=modelConfig["w"]).to(device)
         # Sampled from standard normal distribution
         savePath = modelConfig["save_weight_dir"]
-        shapes = ['sc', 'ps', 'sp', 'pa', 'rs', 'gg', 'in', 'cr', 'rp']
-        classes = ['1']
+        # shapes = ['cluster_0', 'cluster_6', 'cluster_5', 'cluster_8', 'cluster_3', 'cluster_9', 'cluster_2', 'cluster_4', 'cluster_7', 'cluster_1']
+        # classes = ['sc', 'ps', 'pa', 'rs', 'gg', 'in', 'cr', 'rp']
+        # shapes = ['cluster_3', 'cluster_2', 'cluster_9', 'cluster_8', 'cluster_0', 'cluster_5', 'cluster_7', 'cluster_6', 'cluster_4', 'cluster_1']
+        shapes = ['cluster_0', 'cluster_3', 'cluster_2', 'cluster_4', 'cluster_1']
+        # classes = ['rs', 'sc', 'ln', 'cr', 'ps', 'pa']
+        classes = ['MT_Crack', 'MT_Free', 'MT_Break', 'MT_Uneven', 'MT_Blowhole', 'MT_Fray']
         # with torch.no_grad():
         #     cls_labelList = []
         #     shape_labelList = []
