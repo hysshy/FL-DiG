@@ -27,44 +27,31 @@ def get_num_classes_samples(dataset):
     num_classes = len(classes)
     return num_classes, num_samples, data_labels_list
 
-def gen_classes_per_node(dataset, num_users, classes_per_user=2, high_prob=0.6, low_prob=0.4):
+def gen_classes_per_node(dataset, num_users, classes_per_user=2):
     """
     creates the data distribution of each client
     :param dataset: pytorch dataset object
     :param num_users: number of clients
     :param classes_per_user: number of classes assigned to each client
-    :param high_prob: highest prob sampled
-    :param low_prob: lowest prob sampled
-    :return: dictionary mapping between classes and proportions, each entry refers to other client
     """
     num_classes, num_samples, _ = get_num_classes_samples(dataset)
-
-    # -------------------------------------------#
-    # Divide classes + num samples for each user #
-    # -------------------------------------------#
-    # assert (classes_per_user * num_users) % num_classes == 0, "equal classes appearance is needed"
     count_per_class = (classes_per_user * num_users) // num_classes + 1
-    class_dict = {}
+    class_list = []
     for i in range(num_classes):
-        # sampling alpha_i_c
-        probs = np.random.uniform(low_prob, high_prob, size=count_per_class)
-        # normalizing
-        probs_norm = (probs / probs.sum()).tolist()
-        class_dict[i] = {'count': count_per_class, 'prob': probs_norm}
+        class_list.append(count_per_class)
 
     # -------------------------------------#
     # Assign each client with data indexes #
     # -------------------------------------#
-    class_partitions = defaultdict(list)
+    class_partitions = []
     for i in range(num_users):
         c = []
         for _ in range(classes_per_user):
-            class_counts = [class_dict[i]['count'] for i in range(num_classes)]
+            class_counts = [class_list[i] for i in range(num_classes)]
             max_class_counts = np.where(np.array(class_counts) == max(class_counts))[0]
             c.append(np.random.choice(max_class_counts))
-            class_dict[c[-1]]['count'] -= 1
-        class_partitions['class'].append(c)
-        class_partitions['prob'].append([class_dict[i]['prob'].pop() for i in c])
+            class_list[c[-1]] -= 1
+        class_partitions.append(c)
     return class_partitions
 
 def gen_data_split(dataset, num_users, class_partitions):
@@ -72,7 +59,6 @@ def gen_data_split(dataset, num_users, class_partitions):
     divide data indexes for each client based on class_partition
     :param dataset: pytorch dataset object (train/val/test)
     :param num_users: number of clients
-    :param class_partitions: proportion of classes per client
     :return: dictionary mapping client to its indexes
     """
     num_classes, num_samples, data_labels_list = get_num_classes_samples(dataset)
@@ -93,12 +79,12 @@ def gen_data_split(dataset, num_users, class_partitions):
     # ------------------------------ #
     user_data_idx = [[] for i in range(num_users)]
     for usr_i in range(num_users):
-        for c, p in zip(class_partitions['class'][usr_i], class_partitions['prob'][usr_i]):
-            # end_idx = int(num_samples[c] * p)
+        for c in class_partitions[usr_i]:
             end_idx = int(num_samples[c])
             user_data_idx[usr_i].extend(data_class_idx[c][:end_idx])
             data_class_idx[c] = data_class_idx[c][end_idx:]
-
+    for i in range(len(user_data_idx)):
+        user_data_idx[i] = np.array(user_data_idx[i])
     return user_data_idx
 
 def dirichlet_split_noniid(train_labels, alpha, n_classes, n_clients):

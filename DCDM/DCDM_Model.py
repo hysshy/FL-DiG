@@ -189,6 +189,7 @@ class AEN(nn.Module):
             h += self.cond_proj1(cemb)[:, :, None, None]
         h = self.block2(h)
         h = self.attn(h)
+        h = h + x
         return h
 
 class cond_embed(nn.Module):
@@ -223,6 +224,7 @@ class ResBlock(nn.Module):
 
     def forward(self, x, temb, cemb, s_cemb):
         h = self.aen(x, temb, cemb, s_cemb)
+        # h = h + x
         h = self.shortcut(h)
         return h
 

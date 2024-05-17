@@ -6,13 +6,13 @@ def main(state='train', device = 'cuda:0', label_id = None):
         "state": state, # or eval
         "epoch": 200,
         "batch_size": 2,
-        "T": 700,
+        "T": 1000,
         "channel": 128,
         "channel_mult": [1, 2, 3, 4],
         "PCA_FCEL": False,
         "AEN":True,
         'embedding_type': 1,
-        "attn": [2,3],
+        "attn": [],
         "num_res_blocks": 2,
         "dropout": 0.15,
         "lr": 1e-4,
@@ -23,15 +23,15 @@ def main(state='train', device = 'cuda:0', label_id = None):
         "grad_clip": 1.,
         "device": device, ### MAKE SURE YOU HAVE A GPU !!!
         "training_load_weight": None,
-        "save_weight_dir": "../test/NEU_model_epoch200_T700_imgsize64_embeddingtype1_fuzzy/",
+        "save_weight_dir": "../test2/NEU_model_epoch200_T1000_ddpm/",
         "test_load_weight": "ckpt_199_.pt",
         "sampledNoisyImgName": "NoisyNoGuidenceImgs3.png",
         "sampledImgName": "SampledNoGuidenceImgs3.png",
         "nrow": 9,
-        "data_dir": '/home/chase/shy/FedDGDA/data/MT/F-train',
+        "data_dir": '/home/chase/shy/FedDiffG/data/MT/F-train',
         "num_labels":6,
         "num_shapes":17,
-        "w": 1,
+        "w": 0.5,
         'label_id': label_id,
         'repeat': 1
         }
@@ -42,7 +42,7 @@ def main(state='train', device = 'cuda:0', label_id = None):
 
 
 if __name__ == '__main__':
-    state = 'train'
+    state = 'test'
     if state == 'train':
         main(state=state)
     else:

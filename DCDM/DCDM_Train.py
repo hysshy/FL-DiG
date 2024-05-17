@@ -93,9 +93,8 @@ def eval(modelConfig: Dict):
     with torch.no_grad():
         device = torch.device(modelConfig["device"])
         model = UNet(T=modelConfig["T"], num_labels=modelConfig['num_labels'], num_shapes=modelConfig["num_shapes"], pca_fcel=modelConfig['PCA_FCEL'],
-                     embedding_type=modelConfig['embedding_type'], ch=modelConfig["channel"], ch_mult=modelConfig["channel_mult"],
-                     attn=modelConfig["attn"], attn_type=modelConfig['attn_type'],
-                     num_res_blocks=modelConfig["num_res_blocks"], dropout=0.)
+                     embedding_type=modelConfig['embedding_type'], ch=modelConfig["channel"], ch_mult=modelConfig["channel_mult"], aen=modelConfig["AEN"],
+                     attn=modelConfig["attn"], num_res_blocks=modelConfig["num_res_blocks"], dropout=0.)
         ckpt = torch.load(os.path.join(
             modelConfig["save_weight_dir"], modelConfig["test_load_weight"]), map_location=device)
         model.load_state_dict(ckpt)

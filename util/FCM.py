@@ -7,8 +7,8 @@ from PIL import Image
 from sklearn.decomposition import PCA
 
 # 定义文件夹路径，聚类数目，模糊指数
-folder = "/home/chase/shy/FedDGDA/data/NEU-CLS-64/sp"
-savePath = '/home/chase/shy/FedDGDA/data/NEU-CLS-64/sp_cluster'# 存放图片的文件夹
+folder = "/home/chase/shy/FedDiffG/data/NEU-CLS-64/sp"
+savePath = '/home/chase/shy/FedDiffG/data/NEU-CLS-64/sp_cluster'# 存放图片的文件夹
 c = 10 # 聚类数目，根据图片的特征和数量选择
 m = 1.5 # 模糊指数，一般取2
 

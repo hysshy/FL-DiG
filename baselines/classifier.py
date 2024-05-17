@@ -23,8 +23,8 @@ transform_test = transforms.Compose([
     transforms.ToTensor(), # 转换为张量
     transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)), # 归一化
 ])
-train_imgPath = '/home/chase/shy/FedDGDA/data/NEU-CLS/F-train'
-test_imgPath = '/home/chase/shy/FedDGDA/data/NEU-CLS/test'
+train_imgPath = '/home/chase/shy/FedDiffG/data/NEU-CLS/F-train'
+test_imgPath = '/home/chase/shy/FedDiffG/data/NEU-CLS/test'
 # 加载数据集
 trainset = datasets.ImageFolder(train_imgPath, transform_train)
 # trainset = torchvision.datasets.CIFAR10(root='./data', train=True, download=True, transform=transform_train) # 训练集
