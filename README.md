@@ -2,14 +2,16 @@
 
 This is the implement of FL-DiG. We trained with MT and NEU-CLS dataset.
 
-##Install Requirement
+## Install Requirement
+
 opencv>==6.5.5
 torch>=1.7.0
 python>=3.6
 scikit-fuzzy>=0.4.2
 scikit-learn>=0.24.2
 
-##How To Run
+## How To Run
+
 
 #### Step 1: Training DCDM
 
