@@ -12,7 +12,8 @@ from DCDM_Diffusion import GaussianDiffusionSampler, GaussianDiffusionTrainer
 from DCDM_Model import UNet
 from Scheduler import GradualWarmupScheduler
 from torchvision import transforms
-from util import pca_fcel
+from DCDM import pca_fcel
+
 
 def train(modelConfig: Dict):
     device = torch.device(modelConfig["device"])
@@ -32,10 +33,10 @@ def train(modelConfig: Dict):
         transforms.ToTensor(),
         transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),
     ])
-    # if modelConfig['PCA_FCEL']:
-    #     fdata_dir = modelConfig["data_dir"].replace('train', 'F-train')
-    #     pca_fcel.embeding(modelConfig['data_dir'], fdata_dir)
-    #     modelConfig['PCA_FCEL'] = fdata_dir
+    if modelConfig['PCA_FCEL']:
+        fdata_dir = modelConfig["data_dir"].replace('train', 'F-train')
+        pca_fcel.embeding(modelConfig['data_dir'], fdata_dir)
+        modelConfig['PCA_FCEL'] = fdata_dir
     dataset = MultiLabelDataset(modelConfig["data_dir"], data_transforms)
     print(dataset.label1list)
     print(dataset.label2list)

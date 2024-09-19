@@ -1,8 +1,9 @@
+import numpy as np
 import torch
 import torch.nn as nn
 from torchvision import datasets, transforms, models
 from torch.utils.data import DataLoader
-from util import gen_classes_per_node, gen_data_split
+from util.util import gen_classes_per_node, gen_data_split, dirichlet_split_noniid
 import copy
 import argparse
 
@@ -55,6 +56,12 @@ class Sever():
         if net == 'resnet50':
             # Load ResNet-50 model
             self.global_model = models.resnet50(pretrained=True)
+            self.global_model.fc = nn.Linear(self.global_model.fc.in_features, class_num)
+        elif net == 'alexnet':
+            self.global_model = models.alexnet(pretrained=True)
+            self.global_model.classifier[6] = torch.nn.Linear(self.global_model.classifier[6].in_features, class_num)
+        elif net == 'googlenet':
+            self.global_model = models.googlenet(pretrained=True)
             self.global_model.fc = nn.Linear(self.global_model.fc.in_features, class_num)
         else:
             assert 'cant find net'
@@ -276,6 +283,13 @@ class Client():
             # Load ResNet-50 model
             self.local_model = models.resnet50(pretrained=True)
             self.local_model.fc = nn.Linear(self.local_model.fc.in_features, class_num)
+        elif net == 'alexnet':
+            self.local_model = models.alexnet(pretrained=True)
+            self.local_model.classifier[6] = torch.nn.Linear(self.local_model.classifier[6].in_features, class_num)
+        elif net == 'googlenet':
+            # Load ResNet-50 model
+            self.local_model = models.googlenet(pretrained=True)
+            self.local_model.fc = nn.Linear(self.local_model.fc.in_features, class_num)
         else:
             assert 'cant find net'
         self.criterion = torch.nn.CrossEntropyLoss()  # 交叉熵损失函数
@@ -403,14 +417,14 @@ if __name__ == '__main__':
         parser.add_argument('--device', default=torch.device("cuda:1" if torch.cuda.is_available() else "cpu"))
         parser.add_argument('--net', type=str, default='resnet50', help='classiffier network')
         parser.add_argument('--class_num', type=int, default=6, help='number of classes')
-        parser.add_argument('--client_num', type=int, default=3, help='number of clients')
-        parser.add_argument('--client_class_num', type=int, default=2, help='number of clients class')
-        parser.add_argument('--num_epochs', type=int, default=80, help='number of epochs')
-        parser.add_argument('--align_datadir', type=str, default='/home/chase/shy/FedDiffG/data/MT/FedDiffG', help='datadir of align dataset')
-        parser.add_argument('--train_datadir', type=str, default='/home/chase/shy/FedDiffG/data/MT/train', help='datadir of train dataset')
-        parser.add_argument('--test_datadir', type=str, default='/home/chase/shy/FedDiffG/data/MT/test', help='datadir of test dataset')
-        parser.add_argument('--align_batch_size', type=int, default=64, help='align batch_size')
-        parser.add_argument('--local_batch_size', type=int, default=64, help='local clients batch_size')
+        parser.add_argument('--client_num', type=int, default=2, help='number of clients')
+        parser.add_argument('--client_class_num', type=int, default=3, help='number of clients class')
+        parser.add_argument('--num_epochs', type=int, default=50, help='number of epochs')
+        parser.add_argument('--align_datadir', type=str, default='data/NEU-CLS/DGDM', help='datadir of align dataset')
+        parser.add_argument('--train_datadir', type=str, default='data/NEU-CLS/train', help='datadir of train dataset')
+        parser.add_argument('--test_datadir', type=str, default='data/NEU-CLS/test', help='datadir of test dataset')
+        parser.add_argument('--align_batch_size', type=int, default=32, help='align batch_size')
+        parser.add_argument('--local_batch_size', type=int, default=32, help='local clients batch_size')
         parser.add_argument('--learning_rate', type=float, default=0.01, help='learning rate')
         parser.add_argument('--client_align', type=bool, default=False, help='align process')
         parser.add_argument('--global_align', type=bool, default=False, help='align process')
@@ -418,8 +432,10 @@ if __name__ == '__main__':
         parser.add_argument('--scaffold', type=bool, default=False, help='add scaffold')
         parser.add_argument('--fedbn', type=bool, default=False, help='add fedbn')
         parser.add_argument('--fednova', type=bool, default=True, help='add fednova')
-
-
+        parser.add_argument('--dirichlet', type=bool, default=False, help='use dirichlet to split no-iid dataset')
+        parser.add_argument('--distribution_dir', type=str, default=None, help='use the distribution as file')
+        parser.add_argument('--save_distribution_dir', type=str, default=None, help='save distribution')
+        parser.add_argument('--r', type=float, default=1.0, help='alpha of dirichlet')
 
         args = parser.parse_args()
         return args
@@ -433,10 +449,20 @@ if __name__ == '__main__':
     train_dataset = datasets.ImageFolder(args.train_datadir, transform)
     align_dataset = datasets.ImageFolder(args.align_datadir, transform)
     test_dataset = datasets.ImageFolder(args.test_datadir, transform)
-    #划分no-iid数据集
     loader_params = {"batch_size": args.local_batch_size, "shuffle": True, "pin_memory": True, "num_workers": 0}
-    cls_partitions = gen_classes_per_node(train_dataset, args.client_num, args.client_class_num)
-    usr_subset_idx = gen_data_split(train_dataset, args.client_num, cls_partitions)
+    #划分no-iid数据集
+    if args.distribution_dir is not None:
+        usr_subset_idx = np.load(args.distribution_dir, allow_pickle=True)
+    else:
+        if args.dirichlet:
+            usr_subset_idx = dirichlet_split_noniid(train_dataset.targets, alpha=args.r, n_classes=args.class_num, n_clients=args.client_num)
+        else:
+            cls_partitions = gen_classes_per_node(train_dataset, args.client_num, args.client_class_num)
+            print(cls_partitions)
+
+            usr_subset_idx = gen_data_split(train_dataset, args.client_num, cls_partitions)
+        if args.save_distribution_dir is not None:
+            np.save(args.save_distribution_dir, usr_subset_idx)
     # create subsets for each client
     subsets = list(map(lambda x: torch.utils.data.Subset(train_dataset, x), usr_subset_idx))
     # create dataloaders from subsets

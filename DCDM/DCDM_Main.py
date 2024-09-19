@@ -28,7 +28,7 @@ def main(state='train', device = 'cuda:0', label_id = None):
         "sampledNoisyImgName": "NoisyNoGuidenceImgs3.png",
         "sampledImgName": "SampledNoGuidenceImgs3.png",
         "nrow": 9,
-        "data_dir": '/home/chase/shy/FedDiffG/data/MT/F-train',
+        "data_dir": 'data/MT/F-train',
         "num_labels":6,
         "num_shapes":17,
         "w": 0.5,
@@ -42,11 +42,12 @@ def main(state='train', device = 'cuda:0', label_id = None):
 
 
 if __name__ == '__main__':
-    state = 'test'
-    if state == 'train':
-        main(state=state)
-    else:
-        main(state=state)
+    state = 'train'
+    main(state=state)
+    # if state == 'train':
+    #     main(state=state)
+    # else:
+    #     main(state=state)
         # for i in range(1):
         #     t = threading.Thread(target=main, args=(state, 'cuda:'+str(1), i))
         #     t.start()
